@@ -1,0 +1,32 @@
+<svg width="48" height="48" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="fav-grad-primary" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#00C48C" />
+      <stop offset="100%" stopColor="#008F65" />
+    </linearGradient>
+    <linearGradient id="fav-grad-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#1E3E33" />
+      <stop offset="100%" stopColor="#172B24" />
+    </linearGradient>
+  </defs>
+
+  <!-- Container -->
+  <rect x="1" y="1" width="38" height="38" rx="10" fill="url(#fav-grad-dark)" stroke="#2A453A" stroke-width="1.2" />
+
+  <!-- Grid lines -->
+  <path d="M1 20H39 M20 1V39" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1" />
+
+  <!-- Bar 1 -->
+  <rect x="8" y="19" width="4.5" height="11" rx="2" fill="#FFFFFF" fill-opacity="0.8" />
+  <path d="M10.25 15V19 M10.25 30V32" stroke="#FFFFFF" stroke-opacity="0.4" stroke-width="1.5" stroke-linecap="round" />
+
+  <!-- Ascending Vector Peak -->
+  <path d="M12 21L17.5 12.5C18.2 11.5 19.8 11.5 20.5 12.5L24 18L30 8" stroke="url(#fav-grad-primary)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Checkpoint node -->
+  <circle cx="30.5" cy="8.5" r="3.5" fill="#00E59B" />
+  <path d="M29.5 8.5L30.2 9.2L31.8 7.6" stroke="#172B24" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Bar 2 -->
+  <rect x="24" y="21" width="4.5" height="9" rx="2" fill="#00A878" fill-opacity="0.85" />
+</svg>
