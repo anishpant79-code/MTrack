@@ -53,6 +53,21 @@ app.get('/api/health', (req, res) => {
     })
 })
 
+// Ensure database connection is ready for stateful API endpoints
+app.use('/api', async (req, res, next) => {
+    if (req.path === '/health') return next()
+    try {
+        await connectDB()
+        next()
+    } catch (err) {
+        console.error('Database connection error on route ' + req.path + ':', err.message)
+        return res.status(503).json({
+            success: false,
+            message: 'Database connection failed: ' + err.message,
+        })
+    }
+})
+
 app.use('/api/auth', authRoutes)
 app.use('/api/claims', claimRoutes)
 app.use('/api/evidence', evidenceRoutes)
