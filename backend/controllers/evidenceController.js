@@ -2,6 +2,30 @@
 import mongoose from 'mongoose'
 import Claim from '../models/Claim.js'
 import Evidence from '../models/Evidence.js'
+import { extractFactsFromText } from '../services/evidenceExtractionService.js'
+
+const OFFICIAL_PRIMARY_DOMAINS = [
+    'bseindia.com',
+    'www.bseindia.com',
+    'nseindia.com',
+    'www.nseindia.com',
+    'nsearchives.nseindia.com',
+    'sebi.gov.in',
+    'www.sebi.gov.in',
+    'mca.gov.in',
+    'www.mca.gov.in',
+    'rbi.org.in',
+    'www.rbi.org.in',
+]
+
+const isOfficialDomain = (urlStr) => {
+    try {
+        const u = new URL(urlStr)
+        return OFFICIAL_PRIMARY_DOMAINS.includes(u.hostname.toLowerCase())
+    } catch {
+        return false
+    }
+}
 
 // ADD EVIDENCE TO A CLAIM
 export const addEvidence = async (req, res) => {
@@ -84,7 +108,12 @@ export const addEvidence = async (req, res) => {
             })
         }
 
-        const safeFacts = facts || []
+        let safeFacts = facts || []
+
+        // If no facts explicitly provided, attempt deterministic extraction from document excerpt
+        if (safeFacts.length === 0 && excerpt.trim()) {
+            safeFacts = extractFactsFromText(excerpt.trim(), claim.extractedDetails?.metric)
+        }
 
         for (const fact of safeFacts) {
             if (
@@ -110,9 +139,14 @@ export const addEvidence = async (req, res) => {
         ]
         const allowedStances = ['supports', 'contradicts', 'neutral', 'not_assessed']
 
-        const sourceAuthority = allowedAuthorities.includes(req.body.sourceAuthority)
+        let sourceAuthority = allowedAuthorities.includes(req.body.sourceAuthority)
             ? req.body.sourceAuthority
             : 'other'
+
+        // Guard: Manual evidence URLs cannot claim official_primary status without originating from verified official domains
+        if (sourceAuthority === 'official_primary' && sourceUrl && !isOfficialDomain(sourceUrl)) {
+            sourceAuthority = 'reputable_secondary'
+        }
 
         const sourceType = allowedSourceTypes.includes(req.body.sourceType)
             ? req.body.sourceType

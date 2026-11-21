@@ -60,10 +60,13 @@ export const verifyClaim = async (req, res) => {
             }
         }
 
-        // Auto-associate company announcements from NSE / SEBI if no evidence attached yet
+        // Auto-associate official statutory disclosures and company announcements
         if (activeClaimDetails?.company) {
-            const existingEvidenceCount = await Evidence.countDocuments({ claim: claim._id })
-            if (existingEvidenceCount === 0) {
+            const existingEvidenceWithFacts = await Evidence.countDocuments({
+                claim: claim._id,
+                'facts.0': { $exists: true },
+            })
+            if (existingEvidenceWithFacts === 0) {
                 await autoAssociateEvidenceForCompany(claim._id, activeClaimDetails.company)
             }
         }
@@ -78,6 +81,19 @@ export const verifyClaim = async (req, res) => {
             claimDetails: activeClaimDetails,
             evidence,
         })
+
+        // Update evidence stance based on verification outcome
+        if (result.status === 'Verified' || result.status === 'Contradicted') {
+            const targetStance = result.status === 'Verified' ? 'supports' : 'contradicts'
+            await Evidence.updateMany(
+                {
+                    claim: claim._id,
+                    'facts.0': { $exists: true },
+                    sourceAuthority: 'official_primary',
+                },
+                { stance: targetStance }
+            )
+        }
 
         // Generate transparent AI / rule explanation
         const aiExplanation = await explainVerificationResult({

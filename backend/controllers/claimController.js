@@ -3,25 +3,61 @@ import Claim from '../models/Claim.js'
 import Evidence from '../models/Evidence.js'
 import { extractClaimDetailsWithGemini } from '../services/geminiService.js'
 import { fetchNSEAnnouncements, fetchSEBIUpdates } from '../services/sourceIngestionService.js'
+import {
+    resolveCompany,
+    getStatutoryDisclosureForCompany,
+} from '../services/evidenceExtractionService.js'
 
-// Automatically find and attach relevant official company announcements
+// Automatically find and attach relevant official statutory disclosures and company announcements
 export const autoAssociateEvidenceForCompany = async (claimId, companyName) => {
     if (!companyName || companyName === 'Specified Company' || companyName.length < 2) {
         return []
     }
 
     try {
+        const resolved = resolveCompany(companyName)
+        const canonicalName = resolved ? resolved.name : companyName.trim()
+        const addedEvidenceIds = []
+
+        // 1. Check if official primary statutory disclosure exists in the repository
+        const statutoryDoc = getStatutoryDisclosureForCompany(companyName)
+        if (statutoryDoc) {
+            const existing = await Evidence.findOne({
+                claim: claimId,
+                sourceUrl: statutoryDoc.sourceUrl,
+            })
+
+            if (!existing) {
+                const doc = await Evidence.create({
+                    claim: claimId,
+                    sourceName: statutoryDoc.sourceName,
+                    sourceType: statutoryDoc.sourceType,
+                    sourceAuthority: statutoryDoc.sourceAuthority,
+                    sourceUrl: statutoryDoc.sourceUrl,
+                    documentTitle: statutoryDoc.documentTitle,
+                    publishedAt: statutoryDoc.publishedAt,
+                    excerpt: statutoryDoc.excerpt,
+                    facts: statutoryDoc.facts || [],
+                    stance: 'not_assessed',
+                })
+                addedEvidenceIds.push(doc._id)
+            } else if (existing.facts.length === 0 && statutoryDoc.facts?.length > 0) {
+                existing.facts = statutoryDoc.facts
+                await existing.save()
+                addedEvidenceIds.push(existing._id)
+            }
+        }
+
+        // 2. Query live announcements from NSE & SEBI
         const [nseResult, sebiResult] = await Promise.all([
-            fetchNSEAnnouncements(companyName).catch(() => ({ data: [] })),
-            fetchSEBIUpdates(companyName).catch(() => ({ data: [] })),
+            fetchNSEAnnouncements(canonicalName).catch(() => ({ data: [] })),
+            fetchSEBIUpdates(canonicalName).catch(() => ({ data: [] })),
         ])
 
         const candidateAnnouncements = [
             ...(nseResult.data || []),
             ...(sebiResult.data || []),
         ]
-
-        const addedEvidenceIds = []
 
         for (const item of candidateAnnouncements) {
             if (!item.sourceUrl || !item.documentTitle) continue
@@ -36,12 +72,12 @@ export const autoAssociateEvidenceForCompany = async (claimId, companyName) => {
                     claim: claimId,
                     sourceName: item.sourceName,
                     sourceType: item.sourceType,
-                    sourceAuthority: 'official_primary',
+                    sourceAuthority: item.sourceAuthority || 'official_primary',
                     sourceUrl: item.sourceUrl,
                     documentTitle: item.documentTitle,
                     publishedAt: item.publishedAt,
                     excerpt: item.excerpt || item.documentTitle,
-                    facts: [],
+                    facts: item.facts || [],
                     stance: 'not_assessed',
                 })
                 addedEvidenceIds.push(doc._id)

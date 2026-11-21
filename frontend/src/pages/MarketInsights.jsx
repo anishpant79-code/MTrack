@@ -26,19 +26,20 @@ function formatDate(date) {
 }
 
 function getItemTitle(item) {
-    return item.title || item.name || 'Untitled announcement'
+    return item.documentTitle || item.title || item.name || 'Untitled announcement'
 }
 
 function getItemLink(item) {
-    return item.link || item.url || item.sourceUrl || item.guid || ''
+    return item.sourceUrl || item.link || item.url || item.guid || ''
 }
 
 function getItemDate(item) {
-    return item.pubDate || item.publishedAt || item.date || item.isoDate
+    return item.publishedAt || item.pubDate || item.date || item.isoDate
 }
 
 function getItemDescription(item) {
     return (
+        item.excerpt ||
         item.contentSnippet ||
         item.description ||
         item.summary ||
@@ -239,14 +240,16 @@ function MarketInsights() {
                 {/* Feed status */}
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#DCE6DF] bg-white px-4 py-3">
                     <div className="flex items-center gap-2">
-                        <span className={`h-2.5 w-2.5 rounded-full ${loading ? 'bg-amber-400' : error ? 'bg-red-400' : 'bg-[#00A878]'}`} />
+                        <span className={`h-2.5 w-2.5 rounded-full ${loading ? 'bg-amber-400' : error ? 'bg-red-400' : (nseUpdates.length === 0 && sebiUpdates.length === 0) ? 'bg-amber-400' : 'bg-[#00A878]'}`} />
 
                         <p className="text-xs font-medium text-gray-600">
                             {loading
                                 ? 'Retrieving official feeds...'
                                 : error
-                                    ? 'Feed retrieval needs attention'
-                                    : 'Official feeds retrieved successfully'}
+                                    ? error
+                                    : (nseUpdates.length === 0 && sebiUpdates.length === 0)
+                                        ? 'No announcements currently available in feeds'
+                                        : 'Official feeds retrieved successfully'}
                         </p>
                     </div>
 

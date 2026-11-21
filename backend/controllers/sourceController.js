@@ -19,9 +19,15 @@ export const getSEBIUpdates = async (req, res) => {
 
         const result = await fetchSEBIUpdates(searchTerm)
 
+        const message = result.count > 0
+            ? 'SEBI updates retrieved successfully'
+            : searchTerm
+                ? `No SEBI updates found matching "${searchTerm}"`
+                : 'No SEBI updates currently available'
+
         return res.status(200).json({
             success: true,
-            message: 'SEBI updates retrieved successfully',
+            message,
             ...result,
         })
     } catch (error) {
@@ -44,9 +50,15 @@ export const getNSEAnnouncements = async (req, res) => {
 
         const result = await fetchNSEAnnouncements(searchTerm)
 
+        const message = result.count > 0
+            ? 'NSE announcements retrieved successfully'
+            : searchTerm
+                ? `No NSE announcements found matching "${searchTerm}"`
+                : 'No NSE announcements currently available'
+
         return res.status(200).json({
             success: true,
-            message: 'NSE announcements retrieved successfully',
+            message,
             ...result,
         })
     } catch (error) {
@@ -129,7 +141,7 @@ const importUpdatesToClaim = async ({
             documentTitle: item.documentTitle,
             publishedAt: item.publishedAt,
             excerpt: item.excerpt,
-            facts: [],
+            facts: item.facts || [],
             stance: 'not_assessed',
         })
 

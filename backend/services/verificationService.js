@@ -1,3 +1,4 @@
+import { normalizeMetric, normalizePeriod } from './evidenceExtractionService.js'
 
 const ALLOWED_AUTHORITIES = [
     'official_primary',
@@ -26,8 +27,7 @@ const calculateTransparencyScore = (evidence, hasComparableFacts) => {
     )
 
     const hasPublicationDate = evidence.some(
-        (item) => item.publishedAt instanceof Date ||
-            Boolean(item.publishedAt)
+        (item) => item.publishedAt instanceof Date || Boolean(item.publishedAt)
     )
 
     if (hasOfficialSource) score += 35
@@ -41,7 +41,7 @@ const calculateTransparencyScore = (evidence, hasComparableFacts) => {
     return Math.min(score, 100)
 }
 
-// Verify a numerical growth claim using two comparable financial figures.
+// Verify a numerical growth claim using two comparable financial figures
 export const verifyFinancialGrowth = ({
     claimDetails,
     evidence = [],
@@ -80,13 +80,14 @@ export const verifyFinancialGrowth = ({
         return {
             status: 'Unverified',
             method: 'financial_growth_comparison',
-            summary: 'No evidence was provided for comparison.',
+            summary: 'No official primary evidence or statutory filings were available for comparison.',
             transparencyScore: 0,
             limitations: ['No source documents or financial figures were available.'],
             calculation: null,
         }
     }
 
+    // Extract all facts from evidence documents, converting Mongoose subdocuments safely
     const facts = evidence.flatMap((item) => {
         if (!Array.isArray(item.facts)) return []
 
@@ -95,9 +96,9 @@ export const verifyFinancialGrowth = ({
             return {
                 metric: raw?.metric,
                 value: raw?.value,
-                unit: raw?.unit,
+                unit: raw?.unit || '₹ Crore',
                 period: raw?.period,
-                basis: raw?.basis,
+                basis: raw?.basis || 'Consolidated',
                 sourceAuthority: item.sourceAuthority,
                 sourceName: item.sourceName,
                 sourceUrl: item.sourceUrl,
@@ -105,37 +106,67 @@ export const verifyFinancialGrowth = ({
         })
     })
 
-    const matchingFacts = facts.filter((fact) =>
-        fact.metric?.trim().toLowerCase() === metric.trim().toLowerCase()
+    const targetMetricNorm = normalizeMetric(metric).toLowerCase()
+
+    // Match facts by metric (supporting common metric equivalencies)
+    const matchingFacts = facts.filter((fact) => {
+        const factMetricNorm = normalizeMetric(fact.metric).toLowerCase()
+        return factMetricNorm === targetMetricNorm
+    })
+
+    const prevPeriodNorm = normalizePeriod(previousPeriod).toLowerCase()
+    const currPeriodNorm = normalizePeriod(currentPeriod).toLowerCase()
+
+    let previousCandidates = matchingFacts.filter(
+        (fact) => normalizePeriod(fact.period).toLowerCase() === prevPeriodNorm
     )
 
-    const prevPeriodNorm = (previousPeriod || '').trim().toLowerCase()
-    const currPeriodNorm = (currentPeriod || '').trim().toLowerCase()
-
-    const previousFacts = matchingFacts.filter(
-        (fact) => (fact.period || '').trim().toLowerCase() === prevPeriodNorm
+    let currentCandidates = matchingFacts.filter(
+        (fact) => normalizePeriod(fact.period).toLowerCase() === currPeriodNorm
     )
 
-    const currentFacts = matchingFacts.filter(
-        (fact) => (fact.period || '').trim().toLowerCase() === currPeriodNorm
-    )
-
-    if (previousFacts.length !== 1 || currentFacts.length !== 1) {
+    if (previousCandidates.length === 0 || currentCandidates.length === 0) {
         return {
             status: 'Unverified',
             method: 'financial_growth_comparison',
-            summary: 'The required financial figures could not be identified unambiguously.',
-            transparencyScore: 0,
+            summary: `Statutory financial figures for ${metric} (${previousPeriod} or ${currentPeriod}) could not be confirmed in available disclosures.`,
+            transparencyScore: calculateTransparencyScore(evidence, false),
             limitations: [
-                `Expected exactly one ${metric} figure for ${previousPeriod} and one for ${currentPeriod}.`,
-                'Missing or duplicate figures must be resolved before verification.',
+                `No official figures found matching metric "${metric}" for baseline period ${previousPeriod} or target period ${currentPeriod}.`,
+                'MTrack AI does not label claims false solely due to absent data.',
             ],
             calculation: null,
         }
     }
 
-    const previous = previousFacts[0]
-    const current = currentFacts[0]
+    // If multiple candidates exist, prefer Consolidated accounting basis (standard in India for listed groups)
+    if (previousCandidates.some((f) => (f.basis || '').toLowerCase() === 'consolidated')) {
+        previousCandidates = previousCandidates.filter((f) => (f.basis || '').toLowerCase() === 'consolidated')
+    }
+    if (currentCandidates.some((f) => (f.basis || '').toLowerCase() === 'consolidated')) {
+        currentCandidates = currentCandidates.filter((f) => (f.basis || '').toLowerCase() === 'consolidated')
+    }
+
+    // Deduplicate corroborating official primary figures with identical values
+    const uniquePrevValues = [...new Set(previousCandidates.map((f) => f.value))]
+    const uniqueCurrValues = [...new Set(currentCandidates.map((f) => f.value))]
+
+    if (uniquePrevValues.length > 1 || uniqueCurrValues.length > 1) {
+        return {
+            status: 'Unverified',
+            method: 'financial_growth_comparison',
+            summary: 'Conflicting financial figures were found across disclosures for the same period and metric.',
+            transparencyScore: calculateTransparencyScore(evidence, false),
+            limitations: [
+                `Multiple conflicting figures found: previous period values [${uniquePrevValues.join(', ')}], current period values [${uniqueCurrValues.join(', ')}].`,
+                'Discrepancy must be resolved through revised official exchange filings.',
+            ],
+            calculation: null,
+        }
+    }
+
+    const previous = previousCandidates[0]
+    const current = currentCandidates[0]
 
     const sameUnit =
         (previous.unit || '').trim().toLowerCase() ===
@@ -163,9 +194,9 @@ export const verifyFinancialGrowth = ({
             summary: 'The financial figures are not sufficiently comparable or authoritative.',
             transparencyScore: calculateTransparencyScore(evidence, false),
             limitations: [
-                ...(!sameUnit ? ['The financial figures use different units.'] : []),
+                ...(!sameUnit ? ['The financial figures use different reporting units.'] : []),
                 ...(!sameBasis ? ['The financial figures use different accounting bases.'] : []),
-                ...(!hasOfficialSource ? ['Both figures must come from official primary sources for this verification rule.'] : []),
+                ...(!hasOfficialSource ? ['Both figures must come from official primary sources (BSE/NSE filings).'] : []),
             ],
             calculation: null,
         }
@@ -204,8 +235,8 @@ export const verifyFinancialGrowth = ({
 
     const summary =
         status === 'Verified'
-            ? `The submitted growth figure of ${claimedGrowthPercent}% is consistent with the calculated growth of ${actualGrowthPercent}%.`
-            : `The submitted growth figure of ${claimedGrowthPercent}% does not match the calculated growth of ${actualGrowthPercent}%.`
+            ? `The submitted growth figure of ${claimedGrowthPercent}% is consistent with the calculated growth of ${actualGrowthPercent}% within ±${tolerancePercent}% tolerance.`
+            : `The submitted growth figure of ${claimedGrowthPercent}% is contradicted by official statutory disclosures (calculated growth is ${actualGrowthPercent}%, discrepancy: ${differencePercent}%).`
 
     return {
         status,
@@ -215,11 +246,11 @@ export const verifyFinancialGrowth = ({
         limitations,
         calculation: {
             metric,
-            previousPeriod,
-            currentPeriod,
+            previousPeriod: previous.period || previousPeriod,
+            currentPeriod: current.period || currentPeriod,
             previousValue: previous.value,
             currentValue: current.value,
-            unit: previous.unit || '',
+            unit: previous.unit || '₹ Crore',
             claimedGrowthPercent,
             actualGrowthPercent,
             differencePercent,
