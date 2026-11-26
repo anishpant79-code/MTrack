@@ -20,8 +20,8 @@ function VerifyClaims() {
     // Structured details extracted or provided
     const [company, setCompany] = useState('')
     const [metric, setMetric] = useState('Revenue')
-    const [previousPeriod, setPreviousPeriod] = useState('FY2025')
-    const [currentPeriod, setCurrentPeriod] = useState('FY2026')
+    const [previousPeriod, setPreviousPeriod] = useState('')
+    const [currentPeriod, setCurrentPeriod] = useState('')
     const [claimedGrowthPercent, setClaimedGrowthPercent] = useState('')
     const [tolerancePercent, setTolerancePercent] = useState('0.5')
 
@@ -120,6 +120,51 @@ function VerifyClaims() {
         let createdClaim = null
 
         try {
+            let activeCompany = company.trim()
+            let activeMetric = metric
+            let activePrevPeriod = previousPeriod.trim()
+            let activeCurrPeriod = currentPeriod.trim()
+            let activeGrowth = hasGrowthDetails ? Number(claimedGrowthPercent) : null
+
+            // If key financial fields are missing, perform instant auto-extraction before submission
+            if (!activeCompany || activeGrowth === null || !activeCurrPeriod) {
+                try {
+                    const extractRes = await fetch(`${API_URL}/claims/extract`, {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                        body: JSON.stringify({ claim: trimmedClaim }),
+                    })
+                    const extractData = await extractRes.json()
+                    if (extractRes.ok && extractData.success && extractData.data) {
+                        const d = extractData.data
+                        if (d.company && d.company !== 'Specified Company') {
+                            activeCompany = d.company
+                            setCompany(d.company)
+                        }
+                        if (d.metric) {
+                            activeMetric = d.metric
+                            setMetric(d.metric)
+                        }
+                        if (d.previousPeriod) {
+                            activePrevPeriod = d.previousPeriod
+                            setPreviousPeriod(d.previousPeriod)
+                        }
+                        if (d.currentPeriod) {
+                            activeCurrPeriod = d.currentPeriod
+                            setCurrentPeriod(d.currentPeriod)
+                        }
+                        if (typeof d.claimedGrowthPercent === 'number') {
+                            activeGrowth = d.claimedGrowthPercent
+                            setClaimedGrowthPercent(String(d.claimedGrowthPercent))
+                        }
+                        if (d.category) setCategory(d.category)
+                        setExtractionSource(d.extractionSource === 'gemini_ai' ? 'Gemini AI' : 'Rule Engine')
+                    }
+                } catch (err) {
+                    console.warn('Auto-extraction fallback failed:', err)
+                }
+            }
+
             // 1. Save the claim in MongoDB with structured details
             const createResponse = await fetch(`${API_URL}/claims`, {
                 method: 'POST',
@@ -128,14 +173,14 @@ function VerifyClaims() {
                     title: trimmedClaim,
                     category,
                     source: source.trim(),
-                    claimDetails: {
-                        company: company.trim(),
-                        metric,
-                        previousPeriod: previousPeriod.trim(),
-                        currentPeriod: currentPeriod.trim(),
-                        claimedGrowthPercent: hasGrowthDetails ? Number(claimedGrowthPercent) : null,
+                    claimDetails: activeCompany ? {
+                        company: activeCompany,
+                        metric: activeMetric,
+                        previousPeriod: activePrevPeriod,
+                        currentPeriod: activeCurrPeriod,
+                        claimedGrowthPercent: activeGrowth,
                         tolerancePercent: Number(tolerancePercent) || 0.5,
-                    },
+                    } : undefined,
                 }),
             })
 
@@ -161,11 +206,11 @@ function VerifyClaims() {
                     headers: getAuthHeaders(),
                     body: JSON.stringify({
                         claimDetails: {
-                            company: company.trim() || createdClaim.extractedDetails?.company,
-                            metric,
-                            previousPeriod: previousPeriod.trim(),
-                            currentPeriod: currentPeriod.trim(),
-                            claimedGrowthPercent: hasGrowthDetails ? Number(claimedGrowthPercent) : null,
+                            company: activeCompany || createdClaim.extractedDetails?.company,
+                            metric: activeMetric || createdClaim.extractedDetails?.metric || 'Revenue',
+                            previousPeriod: activePrevPeriod || createdClaim.extractedDetails?.previousPeriod || '',
+                            currentPeriod: activeCurrPeriod || createdClaim.extractedDetails?.currentPeriod || '',
+                            claimedGrowthPercent: activeGrowth !== null ? activeGrowth : createdClaim.extractedDetails?.claimedGrowthPercent,
                             tolerancePercent: Number(tolerancePercent) || 0.5,
                         },
                     }),
@@ -341,16 +386,54 @@ function VerifyClaims() {
                         <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xs text-gray-400 font-medium hidden sm:inline">Try genuine case:</span>
                             {[
-                                { label: 'TCS Revenue (+6.85%)', text: 'Tata Consultancy Services consolidated revenue grew by 6.85% in FY2024.' },
-                                { label: 'Infosys Profit (+25% Rumor)', text: 'Infosys consolidated net profit jumped by 25% in FY2024.' },
-                                { label: 'Reliance Gross (+2.59%)', text: 'Reliance Industries consolidated gross revenue grew by 2.59% in FY2024.' },
-                                { label: 'Tata Motors (Unverified Forward)', text: 'Tata Motors electric commercial vehicle deliveries will increase by 45% next financial year.' },
+                                {
+                                    label: 'TCS Revenue (+6.85%)',
+                                    text: 'Tata Consultancy Services consolidated revenue grew by 6.85% in FY2024.',
+                                    company: 'Tata Consultancy Services',
+                                    metric: 'Revenue',
+                                    previousPeriod: 'FY2023',
+                                    currentPeriod: 'FY2024',
+                                    claimedGrowthPercent: '6.85',
+                                },
+                                {
+                                    label: 'Infosys Profit (+25% Rumor)',
+                                    text: 'Infosys consolidated net profit jumped by 25% in FY2024.',
+                                    company: 'Infosys',
+                                    metric: 'Net Profit',
+                                    previousPeriod: 'FY2023',
+                                    currentPeriod: 'FY2024',
+                                    claimedGrowthPercent: '25',
+                                },
+                                {
+                                    label: 'Reliance Gross (+2.59%)',
+                                    text: 'Reliance Industries consolidated gross revenue grew by 2.59% in FY2024.',
+                                    company: 'Reliance Industries',
+                                    metric: 'Revenue',
+                                    previousPeriod: 'FY2023',
+                                    currentPeriod: 'FY2024',
+                                    claimedGrowthPercent: '2.59',
+                                },
+                                {
+                                    label: 'Tata Motors (Unverified Forward)',
+                                    text: 'Tata Motors electric commercial vehicle deliveries will increase by 45% next financial year.',
+                                    company: 'Tata Motors',
+                                    metric: 'Deliveries',
+                                    previousPeriod: 'FY2024',
+                                    currentPeriod: 'FY2025',
+                                    claimedGrowthPercent: '45',
+                                },
                             ].map((s, idx) => (
                                 <button
                                     key={idx}
                                     type="button"
                                     onClick={() => {
                                         setClaim(s.text)
+                                        setCompany(s.company)
+                                        setMetric(s.metric)
+                                        setPreviousPeriod(s.previousPeriod)
+                                        setCurrentPeriod(s.currentPeriod)
+                                        setClaimedGrowthPercent(s.claimedGrowthPercent)
+                                        setExtractionSource('Verified Benchmark')
                                         extractDetails(s.text)
                                     }}
                                     className="rounded-lg border border-[#DCE6DF] bg-[#F5F8F6] px-2.5 py-1 text-xs font-semibold text-[#008F65] hover:bg-[#E2F0E8] hover:border-[#00A878] transition cursor-pointer"
@@ -588,6 +671,9 @@ function VerifyClaims() {
                                 onClick={() => {
                                     setClaim('')
                                     setCompany('')
+                                    setMetric('Revenue')
+                                    setPreviousPeriod('')
+                                    setCurrentPeriod('')
                                     setClaimedGrowthPercent('')
                                     setSubmittedClaim(null)
                                     setExtractionSource(null)

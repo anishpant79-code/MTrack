@@ -137,10 +137,31 @@ export const createClaim = async (req, res) => {
             })
         }
 
-        // Extract entities if not explicitly provided
+        // Extract entities if not explicitly provided or if incomplete
         let extractedDetails = claimDetails
-        if (!extractedDetails || !extractedDetails.metric) {
-            extractedDetails = await extractClaimDetailsWithGemini(title.trim())
+        if (
+            !extractedDetails ||
+            !extractedDetails.company ||
+            !extractedDetails.currentPeriod ||
+            !Number.isFinite(extractedDetails.claimedGrowthPercent)
+        ) {
+            const aiExtracted = await extractClaimDetailsWithGemini(title.trim())
+            extractedDetails = {
+                company: extractedDetails?.company?.trim() || aiExtracted?.company || '',
+                metric: extractedDetails?.metric || aiExtracted?.metric || 'Revenue',
+                previousPeriod: extractedDetails?.previousPeriod?.trim() || aiExtracted?.previousPeriod || '',
+                currentPeriod: extractedDetails?.currentPeriod?.trim() || aiExtracted?.currentPeriod || '',
+                claimedGrowthPercent:
+                    Number.isFinite(extractedDetails?.claimedGrowthPercent)
+                        ? extractedDetails.claimedGrowthPercent
+                        : Number.isFinite(aiExtracted?.claimedGrowthPercent)
+                        ? aiExtracted.claimedGrowthPercent
+                        : null,
+                tolerancePercent:
+                    typeof extractedDetails?.tolerancePercent === 'number'
+                        ? extractedDetails.tolerancePercent
+                        : aiExtracted?.tolerancePercent || 0.5,
+            }
         }
 
         const claim = await Claim.create({

@@ -43,20 +43,45 @@ export const verifyClaim = async (req, res) => {
 
         if (
             !activeClaimDetails ||
-            typeof activeClaimDetails !== 'object' ||
-            !activeClaimDetails.metric
+            !activeClaimDetails.company ||
+            !activeClaimDetails.currentPeriod ||
+            !Number.isFinite(activeClaimDetails.claimedGrowthPercent)
         ) {
-            if (claim.extractedDetails && claim.extractedDetails.metric) {
+            const saved = claim.extractedDetails
+            if (
+                saved &&
+                saved.company &&
+                saved.currentPeriod &&
+                Number.isFinite(saved.claimedGrowthPercent)
+            ) {
                 activeClaimDetails = {
-                    company: claim.extractedDetails.company,
-                    metric: claim.extractedDetails.metric,
-                    previousPeriod: claim.extractedDetails.previousPeriod,
-                    currentPeriod: claim.extractedDetails.currentPeriod,
-                    claimedGrowthPercent: claim.extractedDetails.claimedGrowthPercent,
-                    tolerancePercent: claim.extractedDetails.tolerancePercent || 0.5,
+                    company: activeClaimDetails?.company?.trim() || saved.company,
+                    metric: activeClaimDetails?.metric || saved.metric || 'Revenue',
+                    previousPeriod: activeClaimDetails?.previousPeriod?.trim() || saved.previousPeriod || '',
+                    currentPeriod: activeClaimDetails?.currentPeriod?.trim() || saved.currentPeriod || '',
+                    claimedGrowthPercent:
+                        Number.isFinite(activeClaimDetails?.claimedGrowthPercent)
+                            ? activeClaimDetails.claimedGrowthPercent
+                            : saved.claimedGrowthPercent,
+                    tolerancePercent: activeClaimDetails?.tolerancePercent || saved.tolerancePercent || 0.5,
                 }
             } else {
-                activeClaimDetails = await extractClaimDetailsWithGemini(claim.title)
+                const aiExtracted = await extractClaimDetailsWithGemini(claim.title)
+                activeClaimDetails = {
+                    company: activeClaimDetails?.company?.trim() || saved?.company || aiExtracted?.company || '',
+                    metric: activeClaimDetails?.metric || saved?.metric || aiExtracted?.metric || 'Revenue',
+                    previousPeriod: activeClaimDetails?.previousPeriod?.trim() || saved?.previousPeriod || aiExtracted?.previousPeriod || '',
+                    currentPeriod: activeClaimDetails?.currentPeriod?.trim() || saved?.currentPeriod || aiExtracted?.currentPeriod || '',
+                    claimedGrowthPercent:
+                        Number.isFinite(activeClaimDetails?.claimedGrowthPercent)
+                            ? activeClaimDetails.claimedGrowthPercent
+                            : Number.isFinite(saved?.claimedGrowthPercent)
+                            ? saved.claimedGrowthPercent
+                            : Number.isFinite(aiExtracted?.claimedGrowthPercent)
+                            ? aiExtracted.claimedGrowthPercent
+                            : null,
+                    tolerancePercent: activeClaimDetails?.tolerancePercent || saved?.tolerancePercent || 0.5,
+                }
             }
         }
 
