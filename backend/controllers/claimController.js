@@ -7,6 +7,7 @@ import {
     resolveCompany,
     getStatutoryDisclosureForCompany,
 } from '../services/evidenceExtractionService.js'
+import { verifyFinancialGrowth } from '../services/verificationService.js'
 
 // Automatically find and attach relevant official statutory disclosures and company announcements
 export const autoAssociateEvidenceForCompany = async (claimId, companyName) => {
@@ -166,6 +167,33 @@ export const createClaim = async (req, res) => {
         // Auto-associate official announcements for the identified company
         if (extractedDetails?.company) {
             await autoAssociateEvidenceForCompany(claim._id, extractedDetails.company)
+        }
+
+        // Run initial verification if structured comparison details are available
+        if (
+            extractedDetails?.metric &&
+            extractedDetails?.previousPeriod &&
+            extractedDetails?.currentPeriod &&
+            Number.isFinite(extractedDetails?.claimedGrowthPercent)
+        ) {
+            const evidence = await Evidence.find({ claim: claim._id }).lean()
+            if (evidence.length > 0) {
+                const result = verifyFinancialGrowth({
+                    claimDetails: extractedDetails,
+                    evidence,
+                })
+                claim.status = result.status
+                claim.verification = {
+                    method: result.method,
+                    summary: result.summary,
+                    limitations: result.limitations,
+                    transparencyScore: result.transparencyScore,
+                    checkedAt: new Date(),
+                    inputs: extractedDetails,
+                    calculation: result.calculation,
+                }
+                await claim.save()
+            }
         }
 
         const populatedClaim = await Claim.findById(claim._id).populate('evidence')

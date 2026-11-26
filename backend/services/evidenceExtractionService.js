@@ -181,6 +181,38 @@ export const COMPANY_REGISTRY = [
             'stltech',
         ],
     },
+    {
+        name: 'ITC Limited',
+        legalName: 'ITC Limited',
+        symbol: 'ITC',
+        aliases: [
+            'itc',
+            'itc limited',
+            'itc ltd',
+        ],
+    },
+    {
+        name: 'Bajaj Finance',
+        legalName: 'Bajaj Finance Limited',
+        symbol: 'BAJFINANCE',
+        aliases: [
+            'bajaj finance',
+            'bajaj finance limited',
+            'bajaj',
+            'bajfinance',
+        ],
+    },
+    {
+        name: 'Sun Pharmaceutical',
+        legalName: 'Sun Pharmaceutical Industries Limited',
+        symbol: 'SUNPHARMA',
+        aliases: [
+            'sun pharma',
+            'sun pharmaceutical',
+            'sun pharmaceutical industries',
+            'sunpharma',
+        ],
+    },
 ]
 
 /**
@@ -499,6 +531,60 @@ export const STATUTORY_FILING_DISCLOSURES = [
         facts: [
             { metric: 'Revenue', value: 6925, unit: '₹ Crore', period: 'FY2023', basis: 'Consolidated' },
             { metric: 'Revenue', value: 5475, unit: '₹ Crore', period: 'FY2024', basis: 'Consolidated' },
+        ],
+    },
+    // 13. ITC Limited
+    {
+        company: 'ITC Limited',
+        symbol: 'ITC',
+        sourceName: 'ITC Limited Annual Report 2023-24 / BSE Regulatory Disclosure',
+        sourceType: 'exchange_filing',
+        sourceAuthority: 'official_primary',
+        documentTitle: 'Audited Consolidated Financial Statements for Year Ended March 31, 2024',
+        sourceUrl: 'https://www.bseindia.com',
+        publishedAt: new Date('2024-05-23T13:30:00.000Z'),
+        excerpt: 'Gross Revenue from operations for the year ended March 31, 2024 was ₹76,840 crore compared to ₹70,937 crore in FY2023 (+8.32%). Consolidated Net Profit reached ₹20,751 crore compared to ₹19,060 crore (+8.86%).',
+        facts: [
+            { metric: 'Revenue', value: 70937, unit: '₹ Crore', period: 'FY2023', basis: 'Consolidated' },
+            { metric: 'Revenue', value: 76840, unit: '₹ Crore', period: 'FY2024', basis: 'Consolidated' },
+            { metric: 'Net Profit', value: 19060, unit: '₹ Crore', period: 'FY2023', basis: 'Consolidated' },
+            { metric: 'Net Profit', value: 20751, unit: '₹ Crore', period: 'FY2024', basis: 'Consolidated' },
+        ],
+    },
+    // 14. Bajaj Finance Limited
+    {
+        company: 'Bajaj Finance',
+        symbol: 'BAJFINANCE',
+        sourceName: 'Bajaj Finance Limited Audited Financial Results / NSE Disclosure',
+        sourceType: 'exchange_filing',
+        sourceAuthority: 'official_primary',
+        documentTitle: 'Audited Consolidated Financial Results for Year Ended March 31, 2024',
+        sourceUrl: 'https://www.nseindia.com',
+        publishedAt: new Date('2024-04-25T11:00:00.000Z'),
+        excerpt: 'Total income on consolidated basis for FY2024 stood at ₹54,668 crore compared to ₹41,406 crore in FY2023 (+32.03%). Consolidated Profit After Tax (PAT) was ₹14,451 crore compared to ₹11,486 crore (+25.80%).',
+        facts: [
+            { metric: 'Revenue', value: 41406, unit: '₹ Crore', period: 'FY2023', basis: 'Consolidated' },
+            { metric: 'Revenue', value: 54668, unit: '₹ Crore', period: 'FY2024', basis: 'Consolidated' },
+            { metric: 'Net Profit', value: 11486, unit: '₹ Crore', period: 'FY2023', basis: 'Consolidated' },
+            { metric: 'Net Profit', value: 14451, unit: '₹ Crore', period: 'FY2024', basis: 'Consolidated' },
+        ],
+    },
+    // 15. Sun Pharmaceutical Industries Limited
+    {
+        company: 'Sun Pharmaceutical',
+        symbol: 'SUNPHARMA',
+        sourceName: 'Sun Pharmaceutical Industries Limited Audited Financial Statements / BSE Filing',
+        sourceType: 'exchange_filing',
+        sourceAuthority: 'official_primary',
+        documentTitle: 'Audited Consolidated Financial Results for Year Ended March 31, 2024',
+        sourceUrl: 'https://www.bseindia.com',
+        publishedAt: new Date('2024-05-22T14:30:00.000Z'),
+        excerpt: 'Consolidated sales from operations for FY2024 were ₹48,497 crore compared to ₹43,886 crore in FY2023 (+10.51%). Net profit after minority interest was ₹9,576 crore vs ₹8,474 crore (+13.00%).',
+        facts: [
+            { metric: 'Revenue', value: 43886, unit: '₹ Crore', period: 'FY2023', basis: 'Consolidated' },
+            { metric: 'Revenue', value: 48497, unit: '₹ Crore', period: 'FY2024', basis: 'Consolidated' },
+            { metric: 'Net Profit', value: 8474, unit: '₹ Crore', period: 'FY2023', basis: 'Consolidated' },
+            { metric: 'Net Profit', value: 9576, unit: '₹ Crore', period: 'FY2024', basis: 'Consolidated' },
         ],
     },
 ]

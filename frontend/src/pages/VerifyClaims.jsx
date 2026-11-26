@@ -344,6 +344,7 @@ function VerifyClaims() {
                                 { label: 'TCS Revenue (+6.85%)', text: 'Tata Consultancy Services consolidated revenue grew by 6.85% in FY2024.' },
                                 { label: 'Infosys Profit (+25% Rumor)', text: 'Infosys consolidated net profit jumped by 25% in FY2024.' },
                                 { label: 'Reliance Gross (+2.59%)', text: 'Reliance Industries consolidated gross revenue grew by 2.59% in FY2024.' },
+                                { label: 'Tata Motors (Unverified Forward)', text: 'Tata Motors electric commercial vehicle deliveries will increase by 45% next financial year.' },
                             ].map((s, idx) => (
                                 <button
                                     key={idx}

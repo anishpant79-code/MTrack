@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai'
+import { resolveCompany } from './evidenceExtractionService.js'
 
 const KNOWN_COMPANIES = [
     'Reliance Industries Limited',
@@ -51,13 +52,18 @@ export const isGeminiConfigured = () => {
 export const deterministicExtractClaimDetails = (claimText = '') => {
     const text = (claimText || '').trim()
 
-    // 1. Company extraction
+    // 1. Company extraction with canonical resolution
     let company = ''
-    for (const known of KNOWN_COMPANIES) {
-        const regex = new RegExp(`\\b${known.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
-        if (regex.test(text)) {
-            company = known
-            break
+    const resolved = resolveCompany(text)
+    if (resolved) {
+        company = resolved.name
+    } else {
+        for (const known of KNOWN_COMPANIES) {
+            const regex = new RegExp(`\\b${known.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+            if (regex.test(text)) {
+                company = known
+                break
+            }
         }
     }
 
@@ -78,16 +84,18 @@ export const deterministicExtractClaimDetails = (claimText = '') => {
         metric = 'EBITDA'
     } else if (/\b(?:eps|earnings per share)\b/i.test(text)) {
         metric = 'Earnings Per Share'
+    } else if (/\b(?:deliveries|delivery)\b/i.test(text)) {
+        metric = 'Deliveries'
     } else if (/\b(?:revenue|sales|turnover|topline)\b/i.test(text)) {
         metric = 'Revenue'
     }
 
-    // 3. Claimed growth % extraction
+    // 3. Claimed growth % extraction (supports %, percent, percentage)
     let claimedGrowthPercent = null
     const growthMatch =
-        text.match(/(?:increased|grew|jumped|rose|surged|up|down|declined|fell|dropped)\s*(?:by\s*)?([+-]?\d+(?:\.\d+)?)\s*%/i) ||
-        text.match(/([+-]?\d+(?:\.\d+)?)\s*%\s*(?:growth|increase|jump|rise|surge|decline|drop|fall)/i) ||
-        text.match(/([+-]?\d+(?:\.\d+)?)\s*%/i)
+        text.match(/(?:increased|grew|jumped|rose|surged|up|down|declined|fell|dropped)\s*(?:by\s*)?([+-]?\d+(?:\.\d+)?)\s*(?:%|percent(?:age)?)/i) ||
+        text.match(/([+-]?\d+(?:\.\d+)?)\s*(?:%|percent(?:age)?)\s*(?:growth|increase|jump|rise|surge|decline|drop|fall)/i) ||
+        text.match(/([+-]?\d+(?:\.\d+)?)\s*(?:%|percent(?:age)?)/i)
 
     if (growthMatch) {
         let val = parseFloat(growthMatch[1])
@@ -97,12 +105,26 @@ export const deterministicExtractClaimDetails = (claimText = '') => {
         claimedGrowthPercent = val
     }
 
+    // Implied growth % if figures are stated but % is omitted
+    if (claimedGrowthPercent === null) {
+        const cleanFigures = text.replace(/,/g, '')
+        const figuresMatch = cleanFigures.match(/(?:from|between)\s*(?:₹|rs\.?)?\s*(\d+(?:\.\d+)?)\s*(?:crore|cr)?\s*(?:to|and)\s*(?:₹|rs\.?)?\s*(\d+(?:\.\d+)?)\s*(?:crore|cr)?/i)
+        if (figuresMatch) {
+            const pVal = parseFloat(figuresMatch[1])
+            const cVal = parseFloat(figuresMatch[2])
+            if (pVal > 0) {
+                claimedGrowthPercent = Math.round((((cVal - pVal) / pVal) * 100) * 100) / 100
+            }
+        }
+    }
+
     // 4. Period extraction
     let currentPeriod = 'FY2026'
     let previousPeriod = 'FY2025'
 
     const fyMatches = text.match(/FY\s*(20\d{2}|\d{2})/gi)
     const quarterMatches = text.match(/Q[1-4]\s*(?:FY)?\s*(?:20\d{2}|\d{2})?/gi)
+    const standaloneYearMatches = text.match(/\b(20\d{2})\b/g)
 
     if (fyMatches && fyMatches.length >= 2) {
         const cleanPeriods = fyMatches.map(p => p.toUpperCase().replace(/\s+/g, ''))
@@ -117,6 +139,10 @@ export const deterministicExtractClaimDetails = (claimText = '') => {
             currentPeriod = `FY${year}`
             previousPeriod = `FY${year - 1}`
         }
+    } else if (standaloneYearMatches && standaloneYearMatches.length > 0) {
+        let year = parseInt(standaloneYearMatches[0], 10)
+        currentPeriod = `FY${year}`
+        previousPeriod = `FY${year - 1}`
     } else if (quarterMatches && quarterMatches.length > 0) {
         currentPeriod = quarterMatches[0].toUpperCase().replace(/\s+/g, ' ')
         previousPeriod = 'Previous Quarter'
@@ -139,7 +165,7 @@ export const deterministicExtractClaimDetails = (claimText = '') => {
         metric,
         previousPeriod,
         currentPeriod,
-        claimedGrowthPercent: claimedGrowthPercent !== null ? claimedGrowthPercent : 15,
+        claimedGrowthPercent: claimedGrowthPercent !== null ? claimedGrowthPercent : null,
         tolerancePercent: 0.5,
         category,
         extractionSource: 'rule_engine',

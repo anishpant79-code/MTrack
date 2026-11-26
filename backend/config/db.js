@@ -1,4 +1,12 @@
 import mongoose from 'mongoose'
+import dns from 'dns'
+
+// Ensure reliable DNS SRV resolution for MongoDB Atlas on Windows environments
+try {
+    dns.setServers(['8.8.8.8', '8.8.4.4'])
+} catch {
+    // Ignore if not supported in environment
+}
 
 let cachedConnection = null
 
